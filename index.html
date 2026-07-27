@@ -420,7 +420,14 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newState)
     });
-    if (!res.ok) throw new Error('put failed: ' + res.status);
+    if (!res.ok) {
+      const err = new Error('put failed: ' + res.status);
+      err.status = res.status;
+      const retryAfter = res.headers.get('Retry-After');
+      const secs = retryAfter ? parseInt(retryAfter, 10) : NaN;
+      if (!isNaN(secs)) err.retryAfterMs = secs * 1000;
+      throw err;
+    }
   }
 
   async function loadState() {
@@ -483,6 +490,9 @@
   }
 
   function describeSyncError(err) {
+    if (err && err.status === 429) {
+      return "sync server is rate-limiting this browser — your changes are saved locally and will retry automatically";
+    }
     const msg = (err && err.message) ? err.message : String(err);
     // A plain "Failed to fetch" with no HTTP status almost always means the request
     // never left the browser — blocked by the page's origin/context, not a real
@@ -492,6 +502,8 @@
     }
     return msg;
   }
+
+  let persistDebounceTimer = null;
 
   async function persist() {
     if (hasClaudeStorage) {
@@ -503,19 +515,39 @@
       return;
     }
 
+    // Always save to this browser immediately — this is what protects your
+    // data even if the remote sync push below is delayed or rate-limited.
     if (hasLocalStorage) writeLocalCache();
+    if (!syncId) return;
 
-    if (syncId) {
-      try {
-        await putRemoteBlob(syncId, state);
-        syncErrorDetail = null;
-        if (syncStatus !== 'synced') { syncStatus = 'synced'; renderSyncPanel(); }
-      } catch (err) {
-        console.error('Remote save failed', err);
-        syncStatus = 'offline';
+    // Debounce the remote push: several quick edits in a row (e.g. adding
+    // a handful of tasks back to back) collapse into a single sync request
+    // instead of firing one per edit, which is what was tripping the 429s.
+    if (persistDebounceTimer) clearTimeout(persistDebounceTimer);
+    syncStatus = 'connecting';
+    renderSyncPanel();
+    persistDebounceTimer = setTimeout(() => { pushRemote(0); }, 1000);
+  }
+
+  async function pushRemote(retryCount) {
+    if (!syncId) return;
+    try {
+      await putRemoteBlob(syncId, state);
+      syncErrorDetail = null;
+      syncStatus = 'synced';
+      renderSyncPanel();
+    } catch (err) {
+      if (err && err.status === 429 && retryCount < 4) {
+        const wait = err.retryAfterMs || (1500 * Math.pow(2, retryCount));
         syncErrorDetail = describeSyncError(err);
         renderSyncPanel();
+        setTimeout(() => pushRemote(retryCount + 1), wait);
+        return;
       }
+      console.error('Remote save failed', err);
+      syncStatus = 'offline';
+      syncErrorDetail = describeSyncError(err);
+      renderSyncPanel();
     }
   }
 
