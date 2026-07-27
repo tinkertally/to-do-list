@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Task Ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #eef2ea;
+    --paper-line: #c9d4c1;
+    --paper-line-strong: #9fb096;
+    --card-bg: #f7f9f4;
+    --ink: #202b21;
+    --ink-soft: #5c6b5f;
+    --ink-faint: #8b988c;
+    --green: #2f6b48;
+    --green-dark: #1f4a32;
+    --red-ink: #a8402f;
+    --gold: #b3903f;
+    --white: #ffffff;
+    --font-display: 'Source Serif 4', Georgia, serif;
+    --font-body: 'IBM Plex Sans', -apple-system, sans-serif;
+    --font-mono: 'IBM Plex Mono', 'Courier New', monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    background-image: linear-gradient(var(--paper-line) 1px, transparent 1px);
+    background-size: 100% 2.1em;
+    background-position: 0 7.4em;
+    color: var(--ink);
+    font-family: var(--font-body);
+    min-height: 100vh;
+    padding: 2.5rem 1.5rem 4rem;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+  }
+
+  .wrap { max-width: 980px; margin: 0 auto; }
+
+  header.masthead {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding-bottom: 1.1rem;
+    margin-bottom: 1.6rem;
+    border-bottom: 3px double var(--paper-line-strong);
+  }
+
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 2rem;
+    margin: 0;
+    letter-spacing: -0.01em;
+    color: var(--green-dark);
+  }
+
+  .masthead .meta { font-family: var(--font-mono); font-size: 0.85rem; color: var(--ink-soft); text-align: right; }
+  .masthead .meta .balance { font-size: 1rem; color: var(--ink); }
+  .masthead .meta .storage-note { font-size: 0.68rem; color: var(--ink-faint); margin-top: 0.15rem; }
+
+  .sync-panel {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem;
+    font-family: var(--font-mono); font-size: 0.72rem; color: var(--ink-soft);
+    margin-top: 0.35rem; justify-content: flex-end;
+  }
+  .sync-panel code { background: var(--card-bg); padding: 0.05rem 0.3rem; border-radius: 2px; border: 1px solid var(--paper-line-strong); }
+  .sync-panel button {
+    font-family: var(--font-body); font-size: 0.7rem; background: none; border: 1px solid var(--paper-line-strong);
+    color: var(--ink-soft); border-radius: 3px; padding: 0.15rem 0.45rem; cursor: pointer;
+  }
+  .sync-panel button:hover { border-color: var(--green); color: var(--green-dark); }
+  .sync-panel input[type="text"] {
+    font-family: var(--font-mono); font-size: 0.75rem; border: 1px solid var(--paper-line-strong); border-radius: 3px;
+    padding: 0.25rem 0.4rem; min-width: 220px;
+  }
+  .sync-error { color: var(--red-ink); font-family: var(--font-body); width: 100%; text-align: right; }
+
+  .board { display: grid; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)); gap: 1.5rem; }
+
+  .ledger-page {
+    background: var(--card-bg);
+    border: 1px solid var(--paper-line-strong);
+    border-radius: 3px;
+    padding: 1.1rem 1.2rem 1.2rem;
+    box-shadow: 0 1px 0 rgba(31, 74, 50, 0.03);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .page-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding-bottom: 0.55rem;
+    border-bottom: 2px solid var(--paper-line-strong);
+    margin-bottom: 0.15rem;
+    position: relative;
+  }
+
+  .page-head h2 {
+    font-family: var(--font-display); font-weight: 600; font-size: 1.15rem; margin: 0;
+    color: var(--ink); word-break: break-word;
+    display: flex; align-items: center; gap: 0.35rem; min-width: 0; padding-right: 1.4rem;
+  }
+  .page-head .tally { font-family: var(--font-mono); font-size: 0.82rem; color: var(--ink-soft); white-space: nowrap; margin-top: 0.2rem; }
+
+  .project-name { cursor: pointer; }
+  .project-name:hover { text-decoration: underline dotted; text-decoration-color: var(--paper-line-strong); text-underline-offset: 3px; }
+
+  .rename-project {
+    flex: none;
+    background: none; border: none; color: var(--ink-faint); font-size: 0.8rem; cursor: pointer;
+    opacity: 0; transition: opacity 0.15s, color 0.15s; padding: 0 0.1rem; line-height: 1;
+  }
+  .ledger-page:hover .rename-project, .rename-project:focus-visible { opacity: 1; }
+  .rename-project:hover { color: var(--green); }
+
+  .rename-box { flex: 1 1 auto; min-width: 0; padding-right: 1.4rem; }
+  .rename-input {
+    width: 100%;
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--ink);
+    border: none;
+    border-bottom: 2px solid var(--green);
+    background: transparent;
+    padding: 0 0 0.1rem;
+  }
+  .rename-input:focus-visible { outline: none; }
+
+  .reorder-btns { display: flex; flex-direction: column; flex: none; gap: 1px; }
+  .reorder-btns button {
+    background: none; border: none; color: var(--ink-faint);
+    font-size: 0.55rem; line-height: 1; cursor: pointer; padding: 0.08rem 0.2rem;
+  }
+  .reorder-btns button:hover:not(:disabled) { color: var(--green); }
+  .reorder-btns button:disabled { color: var(--paper-line); cursor: default; }
+
+  .drag-handle, .drag-handle-project {
+    cursor: grab;
+    touch-action: none;
+    color: var(--ink-faint);
+    font-size: 0.8rem;
+    letter-spacing: -1px;
+    user-select: none;
+    flex: none;
+    margin-top: 0.15rem;
+  }
+  .drag-handle:active, .drag-handle-project:active { cursor: grabbing; }
+
+  body.dragging-active { user-select: none; }
+  li.task-row.dragging { opacity: 0.4; }
+  .ledger-page.dragging { opacity: 0.5; }
+
+  .delete-project {
+    position: absolute;
+    top: -0.3rem;
+    right: -0.3rem;
+    background: none;
+    border: none;
+    color: var(--ink-faint);
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s, color 0.15s;
+    padding: 0.2rem 0.4rem;
+    border-radius: 3px;
+    font-family: var(--font-body);
+  }
+
+  .ledger-page:hover .delete-project, .delete-project:focus-visible { opacity: 1; }
+  .delete-project:hover { color: var(--red-ink); }
+  .delete-project.confirm-armed {
+    opacity: 1;
+    color: var(--white);
+    background: var(--red-ink);
+    font-size: 0.72rem;
+    padding: 0.2rem 0.5rem;
+  }
+
+  ul.tasks { list-style: none; margin: 0.3rem 0 0; padding: 0; }
+
+  li.task-row { display: flex; align-items: flex-start; gap: 0.55rem; padding: 0.55rem 0; border-bottom: 1px solid var(--paper-line); }
+  li.task-row:last-child { border-bottom: none; }
+  li.task-row.editing { align-items: center; }
+
+  .check {
+    flex: none;
+    width: 18px;
+    height: 18px;
+    margin-top: 0.1rem;
+    border: 1.5px solid var(--ink-faint);
+    border-radius: 3px;
+    background: var(--white);
+    cursor: pointer;
+    padding: 0;
+    position: relative;
+    transition: border-color 0.15s, background 0.15s;
+  }
+
+  .check:hover { border-color: var(--green); }
+
+  .check svg {
+    position: absolute; top: -1.5px; left: -1.5px; width: 18px; height: 18px;
+    stroke: var(--white); stroke-width: 2.4; fill: none;
+    stroke-linecap: round; stroke-linejoin: round;
+    stroke-dasharray: 20; stroke-dashoffset: 20;
+  }
+
+  li.task-row.done .check { background: var(--green); border-color: var(--green); }
+  li.task-row.done .check svg { stroke-dashoffset: 0; transition: stroke-dashoffset 0.28s ease; }
+
+  .task-text { flex: 1 1 auto; font-size: 0.94rem; line-height: 1.35; padding-top: 0.05rem; word-break: break-word; cursor: pointer; }
+  .task-text:hover { text-decoration: underline dotted; text-decoration-color: var(--paper-line-strong); text-underline-offset: 2px; }
+  li.task-row.done .task-text { color: var(--ink-faint); text-decoration: line-through; text-decoration-color: var(--ink-faint); }
+
+  .due { flex: none; font-family: var(--font-mono); font-size: 0.78rem; color: var(--ink-soft); padding-top: 0.15rem; white-space: nowrap; }
+  li.task-row.overdue .due { color: var(--red-ink); font-weight: 500; }
+
+  .edit-task-text {
+    flex: 1 1 auto; min-width: 0;
+    border: none; border-bottom: 2px solid var(--green); background: transparent;
+    font-family: var(--font-body); font-size: 0.94rem; color: var(--ink); padding: 0 0 0.15rem;
+  }
+  .edit-task-text:focus-visible { outline: none; }
+
+  .edit-task-date {
+    flex: none; width: 8rem;
+    border: 1px solid var(--paper-line-strong); border-radius: 3px; background: var(--white);
+    font-family: var(--font-mono); font-size: 0.74rem; color: var(--ink-soft); padding: 0.2rem 0.35rem;
+  }
+
+  .delete-task {
+    flex: none; background: none; border: none; color: var(--ink-faint);
+    font-size: 1rem; cursor: pointer; opacity: 0; transition: opacity 0.15s; padding: 0 0.1rem;
+  }
+  li.task-row:hover .delete-task, .delete-task:focus-visible { opacity: 1; }
+  .delete-task:hover { color: var(--red-ink); }
+
+  .empty-tasks { font-size: 0.85rem; color: var(--ink-faint); font-style: italic; padding: 0.6rem 0 0.2rem; }
+
+  .add-task-row { display: flex; gap: 0.4rem; margin-top: 0.65rem; }
+
+  .add-task-row input[type="text"] {
+    flex: 1 1 auto; min-width: 0;
+    border: 1px solid var(--paper-line-strong); background: var(--white); border-radius: 3px;
+    padding: 0.4rem 0.55rem; font-family: var(--font-body); font-size: 0.86rem; color: var(--ink);
+  }
+
+  .add-task-row input[type="date"] {
+    flex: none; width: 8.6rem;
+    border: 1px solid var(--paper-line-strong); background: var(--white); border-radius: 3px;
+    padding: 0.35rem 0.35rem; font-family: var(--font-mono); font-size: 0.76rem; color: var(--ink-soft);
+  }
+
+  .add-task-row input:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
+
+  .add-task-row button {
+    flex: none; background: var(--green); color: var(--white); border: none; border-radius: 3px;
+    width: 2rem; font-size: 1.1rem; cursor: pointer; transition: background 0.15s;
+  }
+  .add-task-row button:hover { background: var(--green-dark); }
+  .add-task-row button:focus-visible { outline: 2px solid var(--green-dark); outline-offset: 2px; }
+
+  details.completed { margin-top: 0.7rem; }
+  details.completed summary { font-family: var(--font-mono); font-size: 0.78rem; color: var(--ink-soft); cursor: pointer; list-style: none; }
+  details.completed summary::-webkit-details-marker { display: none; }
+  details.completed summary::before { content: "▸ "; }
+  details.completed[open] summary::before { content: "▾ "; }
+  details.completed ul.tasks { margin-top: 0.4rem; }
+
+  .add-project-tile {
+    border: 1.5px dashed var(--paper-line-strong); border-radius: 3px; background: transparent;
+    color: var(--ink-soft); font-family: var(--font-body); font-size: 0.92rem; cursor: pointer;
+    min-height: 90px; display: flex; align-items: center; justify-content: center;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .add-project-tile:hover { border-color: var(--green); color: var(--green-dark); }
+
+  .add-project-box {
+    background: var(--card-bg); border: 1px solid var(--paper-line-strong); border-radius: 3px;
+    padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: 0.55rem;
+    min-height: 90px; justify-content: center;
+  }
+
+  .add-project-box input {
+    border: 1px solid var(--paper-line-strong); background: var(--white); border-radius: 3px;
+    padding: 0.45rem 0.6rem; font-family: var(--font-display); font-size: 1rem; color: var(--ink);
+  }
+  .add-project-box input:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
+
+  .add-project-actions { display: flex; gap: 0.5rem; }
+  .add-project-actions button { font-family: var(--font-body); font-size: 0.82rem; border-radius: 3px; border: none; padding: 0.4rem 0.75rem; cursor: pointer; }
+  .add-project-actions .save { background: var(--green); color: var(--white); }
+  .add-project-actions .save:hover { background: var(--green-dark); }
+  .add-project-actions .cancel { background: transparent; color: var(--ink-soft); }
+  .add-project-actions .cancel:hover { color: var(--red-ink); }
+
+  .loading, .empty-board { font-family: var(--font-mono); color: var(--ink-soft); font-size: 0.9rem; padding: 2rem 0; text-align: center; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="masthead">
+      <h1>Task Ledger</h1>
+      <div class="meta">
+        <div id="today-line"></div>
+        <div class="balance" id="balance-line">—</div>
+        <div class="storage-note" id="storage-note"></div>
+        <div id="sync-panel"></div>
+      </div>
+    </header>
+    <div id="app">
+      <div class="loading">Opening the ledger…</div>
+    </div>
+  </div>
+
+<script>
+(function () {
+  const LOCAL_CACHE_KEY = 'ledger:data';
+  const SYNC_ID_KEY = 'ledger:syncId';
+  const REMOTE_BASE = 'https://jsonblob.com/api/jsonBlob';
+
+  const app = document.getElementById('app');
+  const todayLine = document.getElementById('today-line');
+  const balanceLine = document.getElementById('balance-line');
+  const storageNote = document.getElementById('storage-note');
+  const syncPanelEl = document.getElementById('sync-panel');
+
+  const hasClaudeStorage = !!(window.storage && typeof window.storage.get === 'function' && typeof window.storage.set === 'function');
+  let hasLocalStorage = false;
+  try {
+    const t = '__ledger_test__';
+    window.localStorage.setItem(t, '1');
+    window.localStorage.removeItem(t);
+    hasLocalStorage = true;
+  } catch (e) { hasLocalStorage = false; }
+
+  let state = null;
+  let addingProject = false;
+  let renamingProjectId = null;
+  let editingTaskKey = null;
+
+  // Remote sync (only relevant when running as a local/downloaded file, not inside Claude)
+  let syncId = null;
+  let syncStatus = 'idle'; // idle | connecting | synced | offline | error
+  let connectingSync = false;
+  let syncError = null;
+  let syncErrorDetail = null;
+
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+  function seedState() {
+    return {
+      projects: [
+        { id: uid(), name: 'AP Taxation Services', tasks: [] },
+        { id: uid(), name: 'Tinker Tally', tasks: [] },
+        { id: uid(), name: 'Home Automation / EV', tasks: [] },
+        { id: uid(), name: 'Family Memoir', tasks: [] }
+      ]
+    };
+  }
+
+  function readLocalCache() {
+    try {
+      const raw = window.localStorage.getItem(LOCAL_CACHE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+
+  function writeLocalCache() {
+    try { window.localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify(state)); } catch (e) {}
+  }
+
+  function extractBlobId(res) {
+    const loc = res.headers.get('Location') || res.headers.get('location');
+    if (loc) {
+      const parts = loc.split('/').filter(Boolean);
+      return parts[parts.length - 1];
+    }
+    return null;
+  }
+
+  async function createRemoteBlob(initialState) {
+    const res = await fetch(REMOTE_BASE, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(initialState)
+    });
+    if (!res.ok) throw new Error('create failed: ' + res.status);
+    const id = extractBlobId(res);
+    if (!id) throw new Error('no blob id returned');
+    return id;
+  }
+
+  async function fetchRemoteBlob(id) {
+    const res = await fetch(REMOTE_BASE + '/' + encodeURIComponent(id), { headers: { Accept: 'application/json' } });
+    if (!res.ok) throw new Error('fetch failed: ' + res.status);
+    return res.json();
+  }
+
+  async function putRemoteBlob(id, newState) {
+    const res = await fetch(REMOTE_BASE + '/' + encodeURIComponent(id), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newState)
+    });
+    if (!res.ok) throw new Error('put failed: ' + res.status);
+  }
+
+  async function loadState() {
+    if (hasClaudeStorage) {
+      try {
+        const result = await window.storage.get(LOCAL_CACHE_KEY, false);
+        state = (result && result.value) ? JSON.parse(result.value) : null;
+        if (!state) { state = seedState(); await persist(); }
+      } catch (err) {
+        console.error('Load failed, starting fresh', err);
+        state = seedState();
+        try { await persist(); } catch (e) {}
+      }
+      storageNote.textContent = 'saved to this artifact';
+      render();
+      return;
+    }
+
+    if (!hasLocalStorage) {
+      state = seedState();
+      storageNote.textContent = 'not saving — storage unavailable';
+      render();
+      return;
+    }
+
+    storageNote.textContent = '';
+    syncId = window.localStorage.getItem(SYNC_ID_KEY);
+
+    if (syncId) {
+      syncStatus = 'connecting';
+      try {
+        state = await fetchRemoteBlob(syncId);
+        syncStatus = 'synced';
+        syncErrorDetail = null;
+        writeLocalCache();
+      } catch (err) {
+        console.error('Remote fetch failed, using cached copy', err);
+        state = readLocalCache() || seedState();
+        syncStatus = 'offline';
+        syncErrorDetail = describeSyncError(err);
+      }
+    } else {
+      state = readLocalCache() || seedState();
+      syncStatus = 'connecting';
+      try {
+        syncId = await createRemoteBlob(state);
+        window.localStorage.setItem(SYNC_ID_KEY, syncId);
+        writeLocalCache();
+        syncStatus = 'synced';
+        syncErrorDetail = null;
+      } catch (err) {
+        console.error('Could not create remote list', err);
+        syncId = null;
+        syncStatus = 'error';
+        syncErrorDetail = describeSyncError(err);
+        writeLocalCache();
+      }
+    }
+    render();
+  }
+
+  function describeSyncError(err) {
+    const msg = (err && err.message) ? err.message : String(err);
+    // A plain "Failed to fetch" with no HTTP status almost always means the request
+    // never left the browser — blocked by the page's origin/context, not a real
+    // connectivity problem. Surface that distinction rather than just "offline".
+    if (/Failed to fetch|NetworkError|Load failed/i.test(msg)) {
+      return 'request blocked before it left the browser (often caused by opening this file via a content:// link instead of file://)';
+    }
+    return msg;
+  }
+
+  async function persist() {
+    if (hasClaudeStorage) {
+      try {
+        await window.storage.set(LOCAL_CACHE_KEY, JSON.stringify(state), false);
+      } catch (err) {
+        console.error('Storage error', err);
+      }
+      return;
+    }
+
+    if (hasLocalStorage) writeLocalCache();
+
+    if (syncId) {
+      try {
+        await putRemoteBlob(syncId, state);
+        syncErrorDetail = null;
+        if (syncStatus !== 'synced') { syncStatus = 'synced'; renderSyncPanel(); }
+      } catch (err) {
+        console.error('Remote save failed', err);
+        syncStatus = 'offline';
+        syncErrorDetail = describeSyncError(err);
+        renderSyncPanel();
+      }
+    }
+  }
+
+  async function connectToSyncId(newId) {
+    newId = (newId || '').trim();
+    if (!newId) return;
+    syncError = null;
+    try {
+      const remoteState = await fetchRemoteBlob(newId);
+      syncId = newId;
+      window.localStorage.setItem(SYNC_ID_KEY, syncId);
+      state = remoteState;
+      writeLocalCache();
+      syncStatus = 'synced';
+      connectingSync = false;
+      render();
+    } catch (err) {
+      syncError = "Couldn't connect — check the ID and your connection.";
+      renderSyncPanel();
+    }
+  }
+
+  async function copySyncId(btn) {
+    if (!syncId) return;
+    let ok = false;
+    try {
+      await navigator.clipboard.writeText(syncId);
+      ok = true;
+    } catch (e) {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = syncId;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        ok = true;
+      } catch (e2) { ok = false; }
+    }
+    if (btn) {
+      btn.textContent = ok ? 'Copied!' : 'Select & copy manually';
+      setTimeout(() => { btn.textContent = 'Copy ID'; }, 1600);
+    }
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return '';
+    const d = new Date(iso + 'T00:00:00');
+    if (isNaN(d)) return '';
+    return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+  }
+
+  function isOverdue(iso, done) {
+    if (!iso || done) return false;
+    const d = new Date(iso + 'T00:00:00');
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    return d < today;
+  }
+
+  function todayHeaderText() {
+    return new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  }
+
+  function updateBalance() {
+    let open = 0;
+    (state.projects || []).forEach(p => p.tasks.forEach(t => { if (!t.done) open++; }));
+    balanceLine.textContent = open === 0 ? 'all clear' : (open + ' open');
+  }
+
+  function checkSvg() { return '<svg viewBox="0 0 18 18"><path d="M4 9.5l3 3 7-7"/></svg>'; }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function escapeAttr(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  function taskKey(projectId, taskId) { return projectId + '::' + taskId; }
+
+  function reorderBtnsHtml(cls, isFirst, isLast) {
+    return `
+      <span class="reorder-btns ${cls}">
+        <button type="button" class="move-up" aria-label="Move up" ${isFirst ? 'disabled' : ''}>▲</button>
+        <button type="button" class="move-down" aria-label="Move down" ${isLast ? 'disabled' : ''}>▼</button>
+      </span>`;
+  }
+
+  function taskRowHtml(project, task, isFirst, isLast) {
+    const overdue = isOverdue(task.due, task.done);
+    const key = taskKey(project.id, task.id);
+    const isEditing = editingTaskKey === key;
+
+    const bodyHtml = isEditing
+      ? `<input type="text" class="edit-task-text" value="${escapeAttr(task.text)}" maxlength="200" />
+         <input type="date" class="edit-task-date" value="${task.due || ''}" />`
+      : `<span class="task-text" title="Click to edit">${escapeHtml(task.text)}</span>
+         <span class="due">${fmtDate(task.due)}</span>`;
+
+    return `
+      <li class="task-row ${task.done ? 'done' : ''} ${overdue ? 'overdue' : ''} ${isEditing ? 'editing' : ''}" data-project="${project.id}" data-task="${task.id}">
+        <span class="drag-handle" draggable="true" aria-hidden="true">⋮⋮</span>
+        ${reorderBtnsHtml('task-reorder', isFirst, isLast)}
+        <button type="button" class="check" aria-label="Toggle done">${checkSvg()}</button>
+        ${bodyHtml}
+        <button type="button" class="delete-task" aria-label="Delete task">×</button>
+      </li>`;
+  }
+
+  function projectHtml(project, isFirst, isLast) {
+    const open = project.tasks.filter(t => !t.done);
+    const done = project.tasks.filter(t => t.done);
+
+    const openRows = open.length
+      ? open.map((t, i) => taskRowHtml(project, t, i === 0, i === open.length - 1)).join('')
+      : '<div class="empty-tasks">No open tasks — add one below.</div>';
+
+    const doneSection = done.length ? `
+      <details class="completed">
+        <summary>Completed (${done.length})</summary>
+        <ul class="tasks">${done.map((t, i) => taskRowHtml(project, t, i === 0, i === done.length - 1)).join('')}</ul>
+      </details>` : '';
+
+    const titleHtml = renamingProjectId === project.id
+      ? `<div class="rename-box"><input type="text" class="rename-input" data-project="${project.id}" value="${escapeAttr(project.name)}" maxlength="80" /></div>`
+      : `<h2><span class="drag-handle-project" draggable="true" aria-hidden="true">⋮⋮</span>${reorderBtnsHtml('project-reorder', isFirst, isLast)}<span class="project-name" title="Click to rename">${escapeHtml(project.name)}</span><button type="button" class="rename-project" aria-label="Rename project" title="Rename project">✎</button></h2>`;
+
+    return `
+      <section class="ledger-page" data-project="${project.id}">
+        <div class="page-head">
+          ${titleHtml}
+          <button type="button" class="delete-project" aria-label="Delete project" title="Delete project" data-armed="0">×</button>
+        </div>
+        <div class="tally">${open.length} open · ${done.length} done</div>
+        <ul class="tasks">${openRows}</ul>
+        <div class="add-task-row" data-project="${project.id}">
+          <input type="text" class="new-task-text" placeholder="Add a task…" maxlength="200" />
+          <input type="date" class="new-task-date" />
+          <button type="button" class="add-task-btn" aria-label="Add task">+</button>
+        </div>
+        ${doneSection}
+      </section>`;
+  }
+
+  function addProjectTileHtml() {
+    if (addingProject) {
+      return `
+        <div class="add-project-box">
+          <input type="text" id="new-project-name" placeholder="Project name…" maxlength="80" />
+          <div class="add-project-actions">
+            <button type="button" class="save" id="save-new-project">Add project</button>
+            <button type="button" class="cancel" id="cancel-add-project">Cancel</button>
+          </div>
+        </div>`;
+    }
+    return `<button type="button" class="add-project-tile" id="show-add-project">+ New project</button>`;
+  }
+
+  function syncPanelHtml() {
+    if (hasClaudeStorage || !hasLocalStorage) return '';
+
+    if (connectingSync) {
+      return `
+        <div class="sync-panel">
+          <input type="text" id="connect-sync-id" placeholder="Paste Sync ID from your other device…" />
+          <button type="button" id="connect-sync-btn">Connect</button>
+          <button type="button" id="cancel-connect-sync">Cancel</button>
+          ${syncError ? `<div class="sync-error">${escapeHtml(syncError)}</div>` : ''}
+        </div>`;
+    }
+
+    const labels = {
+      synced: 'Synced',
+      connecting: 'Connecting…',
+      offline: 'Offline — showing last saved copy',
+      error: 'Sync unavailable — saving to this browser only',
+      idle: ''
+    };
+
+    return `
+      <div class="sync-panel">
+        <span class="sync-status">${escapeHtml(labels[syncStatus] || '')}${syncId ? ` · <code>${escapeHtml(syncId)}</code>` : ''}</span>
+        ${syncId ? `<button type="button" id="copy-sync-id">Copy ID</button>` : ''}
+        <button type="button" id="show-connect-sync">Connect a different list</button>
+        ${syncErrorDetail && (syncStatus === 'offline' || syncStatus === 'error') ? `<div class="sync-error">${escapeHtml(syncErrorDetail)}</div>` : ''}
+      </div>`;
+  }
+
+  function renderSyncPanel() {
+    syncPanelEl.innerHTML = syncPanelHtml();
+    attachSyncHandlers();
+  }
+
+  function render() {
+    todayLine.textContent = todayHeaderText();
+    updateBalance();
+    const projects = state.projects || [];
+    const projectsHtml = projects.map((p, i) => projectHtml(p, i === 0, i === projects.length - 1)).join('');
+    app.innerHTML = `<div class="board">${projectsHtml}${addProjectTileHtml()}</div>`;
+    renderSyncPanel();
+    attachHandlers();
+  }
+
+  function addProject() {
+    const input = document.getElementById('new-project-name');
+    const name = input.value.trim();
+    if (!name) { input.focus(); return; }
+    state.projects.push({ id: uid(), name, tasks: [] });
+    addingProject = false;
+    render();
+    persist();
+  }
+
+  function addTask(row) {
+    const projectId = row.dataset.project;
+    const textInput = row.querySelector('.new-task-text');
+    const dateInput = row.querySelector('.new-task-date');
+    const text = textInput.value.trim();
+    if (!text) { textInput.focus(); return; }
+    const project = state.projects.find(p => p.id === projectId);
+    project.tasks.push({ id: uid(), text, done: false, due: dateInput.value || null });
+    render();
+    persist();
+    focusAddTaskInput(projectId);
+  }
+
+  function focusAddTaskInput(projectId) {
+    const row = document.querySelector(`.add-task-row[data-project="${projectId}"]`);
+    const input = row && row.querySelector('.new-task-text');
+    if (input) input.focus();
+  }
+
+  function enterRename(projectId) {
+    renamingProjectId = projectId;
+    render();
+    const input = document.querySelector(`.rename-input[data-project="${projectId}"]`);
+    if (input) { input.focus(); input.select(); }
+  }
+
+  function commitRename(projectId, value, cancelled) {
+    if (!cancelled) {
+      const name = value.trim();
+      if (name) {
+        const project = state.projects.find(p => p.id === projectId);
+        if (project) project.name = name;
+      }
+    }
+    renamingProjectId = null;
+    render();
+    if (!cancelled) persist();
+  }
+
+  function enterTaskEdit(projectId, taskId) {
+    editingTaskKey = taskKey(projectId, taskId);
+    render();
+    const row = document.querySelector(`li.task-row[data-project="${projectId}"][data-task="${taskId}"]`);
+    const input = row && row.querySelector('.edit-task-text');
+    if (input) { input.focus(); input.select(); }
+  }
+
+  function commitTaskEdit(projectId, taskId, cancelled) {
+    const key = taskKey(projectId, taskId);
+    if (editingTaskKey !== key) return;
+    if (!cancelled) {
+      const row = document.querySelector(`li.task-row[data-project="${projectId}"][data-task="${taskId}"]`);
+      const textInput = row && row.querySelector('.edit-task-text');
+      const dateInput = row && row.querySelector('.edit-task-date');
+      const text = textInput ? textInput.value.trim() : '';
+      const project = state.projects.find(p => p.id === projectId);
+      const task = project && project.tasks.find(t => t.id === taskId);
+      if (task && text) {
+        task.text = text;
+        task.due = (dateInput && dateInput.value) ? dateInput.value : null;
+      }
+    }
+    editingTaskKey = null;
+    render();
+    if (!cancelled) persist();
+  }
+
+  function moveTask(projectId, taskId, direction) {
+    const project = state.projects.find(p => p.id === projectId);
+    if (!project) return;
+    const task = project.tasks.find(t => t.id === taskId);
+    if (!task) return;
+    const subsetIds = project.tasks.filter(t => t.done === task.done).map(t => t.id);
+    const idx = subsetIds.indexOf(taskId);
+    const newIdx = idx + direction;
+    if (newIdx < 0 || newIdx >= subsetIds.length) return;
+    const fullIdxA = project.tasks.findIndex(t => t.id === subsetIds[idx]);
+    const fullIdxB = project.tasks.findIndex(t => t.id === subsetIds[newIdx]);
+    const tmp = project.tasks[fullIdxA];
+    project.tasks[fullIdxA] = project.tasks[fullIdxB];
+    project.tasks[fullIdxB] = tmp;
+    render();
+    persist();
+  }
+
+  function moveProject(projectId, direction) {
+    const idx = state.projects.findIndex(p => p.id === projectId);
+    if (idx === -1) return;
+    const newIdx = idx + direction;
+    if (newIdx < 0 || newIdx >= state.projects.length) return;
+    const tmp = state.projects[idx];
+    state.projects[idx] = state.projects[newIdx];
+    state.projects[newIdx] = tmp;
+    render();
+    persist();
+  }
+
+  function reorderTasksFromDom(ulEl, projectId) {
+    const ids = Array.from(ulEl.querySelectorAll(':scope > li.task-row')).map(li => li.dataset.task);
+    const project = state.projects.find(p => p.id === projectId);
+    if (!project) return;
+    const idSet = new Set(ids);
+    const reordered = ids.map(id => project.tasks.find(t => t.id === id)).filter(Boolean);
+    const untouched = project.tasks.filter(t => !idSet.has(t.id));
+    const firstIsDone = reordered.length ? reordered[0].done : false;
+    project.tasks = firstIsDone ? [...untouched, ...reordered] : [...reordered, ...untouched];
+  }
+
+  function taskDragStart(e, handle) {
+    const row = handle.closest('.task-row');
+    e.dataTransfer.effectAllowed = 'move';
+    try { e.dataTransfer.setData('text/plain', row.dataset.task); } catch (err) {}
+    try { e.dataTransfer.setDragImage(row, 16, 16); } catch (err) {}
+    row.classList.add('dragging');
+    document.body.classList.add('dragging-active');
+  }
+
+  function taskDragEnd(e, handle) {
+    const row = handle.closest('.task-row');
+    const list = row.closest('ul.tasks');
+    const projectId = row.dataset.project;
+    row.classList.remove('dragging');
+    document.body.classList.remove('dragging-active');
+    reorderTasksFromDom(list, projectId);
+    persist();
+    render();
+  }
+
+  function taskListDragOver(e, list) {
+    const dragging = list.querySelector('.task-row.dragging');
+    if (!dragging) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const targetRow = e.target.closest('li.task-row');
+    if (targetRow && targetRow !== dragging && targetRow.closest('ul.tasks') === list) {
+      const rect = targetRow.getBoundingClientRect();
+      const before = e.clientY < rect.top + rect.height / 2;
+      list.insertBefore(dragging, before ? targetRow : targetRow.nextSibling);
+    }
+  }
+
+  function reorderProjectsFromDom(board) {
+    const ids = Array.from(board.querySelectorAll('.ledger-page')).map(sec => sec.dataset.project);
+    const byId = new Map(state.projects.map(p => [p.id, p]));
+    state.projects = ids.map(id => byId.get(id)).filter(Boolean);
+  }
+
+  function projectDragStart(e, handle) {
+    const section = handle.closest('.ledger-page');
+    e.dataTransfer.effectAllowed = 'move';
+    try { e.dataTransfer.setData('text/plain', section.dataset.project); } catch (err) {}
+    try { e.dataTransfer.setDragImage(section, 16, 16); } catch (err) {}
+    section.classList.add('dragging');
+    document.body.classList.add('dragging-active');
+  }
+
+  function projectDragEnd(e, handle) {
+    const section = handle.closest('.ledger-page');
+    const board = section.closest('.board');
+    section.classList.remove('dragging');
+    document.body.classList.remove('dragging-active');
+    reorderProjectsFromDom(board);
+    persist();
+    render();
+  }
+
+  function boardDragOver(e, board) {
+    const dragging = board.querySelector('.ledger-page.dragging');
+    if (!dragging) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const targetSection = e.target.closest('.ledger-page');
+    if (targetSection && targetSection !== dragging && targetSection.parentElement === board) {
+      const siblings = Array.from(board.querySelectorAll('.ledger-page'));
+      const dragIndex = siblings.indexOf(dragging);
+      const targetIndex = siblings.indexOf(targetSection);
+      board.insertBefore(dragging, dragIndex < targetIndex ? targetSection.nextSibling : targetSection);
+    }
+  }
+
+  function attachSyncHandlers() {
+    const copyBtn = document.getElementById('copy-sync-id');
+    if (copyBtn) copyBtn.addEventListener('click', () => copySyncId(copyBtn));
+
+    const showConnectBtn = document.getElementById('show-connect-sync');
+    if (showConnectBtn) showConnectBtn.addEventListener('click', () => {
+      connectingSync = true; syncError = null; renderSyncPanel();
+      const inp = document.getElementById('connect-sync-id');
+      if (inp) inp.focus();
+    });
+
+    const cancelConnectBtn = document.getElementById('cancel-connect-sync');
+    if (cancelConnectBtn) cancelConnectBtn.addEventListener('click', () => { connectingSync = false; syncError = null; renderSyncPanel(); });
+
+    const connectBtn = document.getElementById('connect-sync-btn');
+    const connectInput = document.getElementById('connect-sync-id');
+    if (connectBtn) connectBtn.addEventListener('click', () => connectToSyncId(connectInput ? connectInput.value : ''));
+    if (connectInput) connectInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') connectToSyncId(connectInput.value); });
+  }
+
+  function attachHandlers() {
+    const showBtn = document.getElementById('show-add-project');
+    if (showBtn) showBtn.addEventListener('click', () => { addingProject = true; render(); });
+
+    const cancelBtn = document.getElementById('cancel-add-project');
+    if (cancelBtn) cancelBtn.addEventListener('click', () => { addingProject = false; render(); });
+
+    const saveBtn = document.getElementById('save-new-project');
+    if (saveBtn) saveBtn.addEventListener('click', addProject);
+
+    const newProjectInput = document.getElementById('new-project-name');
+    if (newProjectInput) {
+      newProjectInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') addProject(); });
+    }
+
+    document.querySelectorAll('.rename-project').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.closest('.ledger-page').dataset.project;
+        enterRename(id);
+      });
+    });
+    document.querySelectorAll('.project-name').forEach(span => {
+      span.addEventListener('click', () => {
+        const id = span.closest('.ledger-page').dataset.project;
+        enterRename(id);
+      });
+    });
+    document.querySelectorAll('.rename-input').forEach(input => {
+      const projectId = input.dataset.project;
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          commitRename(projectId, input.value, false);
+        } else if (e.key === 'Escape') {
+          input.dataset.cancelled = '1';
+          commitRename(projectId, input.value, true);
+        }
+      });
+      input.addEventListener('blur', () => {
+        if (input.dataset.cancelled === '1') return;
+        commitRename(projectId, input.value, false);
+      });
+    });
+
+    document.querySelectorAll('.task-text').forEach(span => {
+      span.addEventListener('click', () => {
+        const row = span.closest('.task-row');
+        enterTaskEdit(row.dataset.project, row.dataset.task);
+      });
+    });
+
+    document.querySelectorAll('li.task-row.editing').forEach(row => {
+      const projectId = row.dataset.project;
+      const taskId = row.dataset.task;
+
+      row.querySelectorAll('.edit-task-text, .edit-task-date').forEach(inp => {
+        inp.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') commitTaskEdit(projectId, taskId, false);
+          else if (e.key === 'Escape') commitTaskEdit(projectId, taskId, true);
+        });
+      });
+
+      row.addEventListener('focusout', (e) => {
+        if (!row.contains(e.relatedTarget)) commitTaskEdit(projectId, taskId, false);
+      });
+    });
+
+    document.querySelectorAll('.drag-handle').forEach(handle => {
+      handle.addEventListener('dragstart', (e) => taskDragStart(e, handle));
+      handle.addEventListener('dragend', (e) => taskDragEnd(e, handle));
+    });
+    document.querySelectorAll('ul.tasks').forEach(list => {
+      list.addEventListener('dragover', (e) => taskListDragOver(e, list));
+      list.addEventListener('drop', (e) => e.preventDefault());
+    });
+
+    document.querySelectorAll('.drag-handle-project').forEach(handle => {
+      handle.addEventListener('dragstart', (e) => projectDragStart(e, handle));
+      handle.addEventListener('dragend', (e) => projectDragEnd(e, handle));
+    });
+    const boardEl = document.querySelector('.board');
+    if (boardEl) {
+      boardEl.addEventListener('dragover', (e) => boardDragOver(e, boardEl));
+      boardEl.addEventListener('drop', (e) => e.preventDefault());
+    }
+
+    document.querySelectorAll('.task-reorder').forEach(group => {
+      const row = group.closest('.task-row');
+      const projectId = row.dataset.project;
+      const taskId = row.dataset.task;
+      const up = group.querySelector('.move-up');
+      const down = group.querySelector('.move-down');
+      if (up) up.addEventListener('click', () => moveTask(projectId, taskId, -1));
+      if (down) down.addEventListener('click', () => moveTask(projectId, taskId, 1));
+    });
+
+    document.querySelectorAll('.project-reorder').forEach(group => {
+      const section = group.closest('.ledger-page');
+      const projectId = section.dataset.project;
+      const up = group.querySelector('.move-up');
+      const down = group.querySelector('.move-down');
+      if (up) up.addEventListener('click', () => moveProject(projectId, -1));
+      if (down) down.addEventListener('click', () => moveProject(projectId, 1));
+    });
+
+    document.querySelectorAll('.delete-project').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const section = btn.closest('.ledger-page');
+        const id = section.dataset.project;
+
+        if (btn.dataset.armed !== '1') {
+          btn.dataset.armed = '1';
+          btn.textContent = 'delete?';
+          btn.classList.add('confirm-armed');
+          btn._disarmTimer = setTimeout(() => {
+            btn.dataset.armed = '0';
+            btn.textContent = '×';
+            btn.classList.remove('confirm-armed');
+          }, 3000);
+          return;
+        }
+
+        clearTimeout(btn._disarmTimer);
+        state.projects = state.projects.filter(p => p.id !== id);
+        render();
+        persist();
+      });
+    });
+
+    document.querySelectorAll('.add-task-row').forEach(row => {
+      row.querySelector('.add-task-btn').addEventListener('click', () => addTask(row));
+      row.querySelector('.new-task-text').addEventListener('keydown', (e) => { if (e.key === 'Enter') addTask(row); });
+    });
+
+    document.querySelectorAll('.task-row').forEach(row => {
+      const projectId = row.dataset.project;
+      const taskId = row.dataset.task;
+
+      row.querySelector('.check').addEventListener('click', () => {
+        const project = state.projects.find(p => p.id === projectId);
+        const task = project.tasks.find(t => t.id === taskId);
+        task.done = !task.done;
+        render();
+        persist();
+      });
+
+      row.querySelector('.delete-task').addEventListener('click', () => {
+        const project = state.projects.find(p => p.id === projectId);
+        project.tasks = project.tasks.filter(t => t.id !== taskId);
+        render();
+        persist();
+      });
+    });
+  }
+
+  loadState();
+})();
+</script>
+</body>
+</html>
