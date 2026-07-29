@@ -87,7 +87,7 @@
   }
   .sync-error { color: var(--red-ink); font-family: var(--font-body); width: 100%; text-align: right; }
 
-  .board { display: grid; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)); gap: 1.5rem; }
+  .board { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 1.5rem; }
 
   .ledger-page {
     background: var(--card-bg);
@@ -97,9 +97,13 @@
     box-shadow: 0 1px 0 rgba(31, 74, 50, 0.03);
     display: flex;
     flex-direction: column;
-    resize: vertical;
-    overflow-y: auto;
+    resize: both;
+    overflow: auto;
+    width: 310px;
+    flex: 0 0 auto;
+    min-width: 260px;
     min-height: 180px;
+    max-width: 100%;
   }
 
   .page-head {
@@ -302,7 +306,7 @@
   .add-project-tile {
     border: 1.5px dashed var(--paper-line-strong); border-radius: 3px; background: transparent;
     color: var(--ink-soft); font-family: var(--font-body); font-size: 0.92rem; cursor: pointer;
-    min-height: 90px; display: flex; align-items: center; justify-content: center;
+    min-height: 90px; width: 310px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center;
     transition: border-color 0.15s, color 0.15s;
   }
   .add-project-tile:hover { border-color: var(--green); color: var(--green-dark); }
@@ -310,7 +314,7 @@
   .add-project-box {
     background: var(--card-bg); border: 1px solid var(--paper-line-strong); border-radius: 3px;
     padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: 0.55rem;
-    min-height: 90px; justify-content: center;
+    min-height: 90px; width: 310px; flex: 0 0 auto; justify-content: center;
   }
 
   .add-project-box input {
@@ -349,6 +353,7 @@
 (function () {
   const LOCAL_CACHE_KEY = 'ledger:data';
   const SYNC_ID_KEY = 'ledger:syncId:v2';
+  const CARD_SIZES_KEY = 'ledger:cardSizes'; // local to this device/browser only — never synced
   const SUPABASE_URL = 'https://lagstmracpzmghcnxhuk.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_kix0WCfC9vIq3wyx2CAuPg_IQ-MPKxv';
 
@@ -371,6 +376,7 @@
   let addingProject = false;
   let renamingProjectId = null;
   let editingTaskKey = null;
+  let cardSizes = {}; // { [projectId]: {w, h} } — local to this device, read once at startup
 
   // Remote sync (only relevant when running as a local/downloaded file, not inside Claude)
   let syncId = null;
@@ -401,6 +407,19 @@
 
   function writeLocalCache() {
     try { window.localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify(state)); } catch (e) {}
+  }
+
+  function loadCardSizes() {
+    if (!hasLocalStorage) return;
+    try {
+      const raw = window.localStorage.getItem(CARD_SIZES_KEY);
+      cardSizes = raw ? JSON.parse(raw) : {};
+    } catch (e) { cardSizes = {}; }
+  }
+
+  function saveCardSizes() {
+    if (!hasLocalStorage) return;
+    try { window.localStorage.setItem(CARD_SIZES_KEY, JSON.stringify(cardSizes)); } catch (e) {}
   }
 
   function supabaseHeaders(extra) {
@@ -460,6 +479,7 @@
   }
 
   async function loadState() {
+    loadCardSizes();
     if (hasClaudeStorage) {
       try {
         const result = await window.storage.get(LOCAL_CACHE_KEY, false);
@@ -715,8 +735,11 @@
       ? `<div class="rename-box"><input type="text" class="rename-input" data-project="${project.id}" value="${escapeAttr(project.name)}" maxlength="80" /></div>`
       : `<h2><span class="drag-handle-project" draggable="true" aria-hidden="true">⋮⋮</span>${reorderBtnsHtml('project-reorder', isFirst, isLast)}<span class="project-name" title="Click to rename">${escapeHtml(project.name)}</span><button type="button" class="rename-project" aria-label="Rename project" title="Rename project">✎</button></h2>`;
 
+    const savedSize = cardSizes[project.id];
+    const sizeStyle = savedSize ? ` style="width:${savedSize.w}px;height:${savedSize.h}px;"` : '';
+
     return `
-      <section class="ledger-page" data-project="${project.id}">
+      <section class="ledger-page" data-project="${project.id}"${sizeStyle}>
         <div class="page-head">
           ${titleHtml}
           <button type="button" class="delete-project" aria-label="Delete project" title="Delete project" data-armed="0">×</button>
@@ -1052,6 +1075,23 @@
     reader.readAsText(file);
   }
 
+  function trackCardResize(section, projectId) {
+    section.addEventListener('pointerdown', (e) => {
+      const rect = section.getBoundingClientRect();
+      // The native resize grip lives in a small zone at the bottom-right corner.
+      const grabbedHandle = (rect.right - e.clientX) < 18 && (rect.bottom - e.clientY) < 18;
+      if (!grabbedHandle) return;
+
+      function onUp() {
+        window.removeEventListener('pointerup', onUp);
+        const r = section.getBoundingClientRect();
+        cardSizes[projectId] = { w: Math.round(r.width), h: Math.round(r.height) };
+        saveCardSizes();
+      }
+      window.addEventListener('pointerup', onUp);
+    });
+  }
+
   function attachHandlers() {
     const showBtn = document.getElementById('show-add-project');
     if (showBtn) showBtn.addEventListener('click', () => { addingProject = true; render(); });
@@ -1125,6 +1165,10 @@
     document.querySelectorAll('ul.tasks').forEach(list => {
       list.addEventListener('dragover', (e) => taskListDragOver(e, list));
       list.addEventListener('drop', (e) => e.preventDefault());
+    });
+
+    document.querySelectorAll('.ledger-page').forEach(section => {
+      trackCardResize(section, section.dataset.project);
     });
 
     document.querySelectorAll('.drag-handle-project').forEach(handle => {
