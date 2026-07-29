@@ -97,6 +97,9 @@
     box-shadow: 0 1px 0 rgba(31, 74, 50, 0.03);
     display: flex;
     flex-direction: column;
+    resize: vertical;
+    overflow-y: auto;
+    min-height: 180px;
   }
 
   .page-head {
@@ -259,13 +262,25 @@
   .add-task-row input[type="text"] {
     flex: 1 1 auto; min-width: 0;
     border: 1px solid var(--paper-line-strong); background: var(--white); border-radius: 3px;
-    padding: 0.4rem 0.55rem; font-family: var(--font-body); font-size: 0.86rem; color: var(--ink);
+    padding: 0.45rem 0.65rem; font-family: var(--font-body); font-size: 0.88rem; color: var(--ink);
   }
 
+  /* Compact date picker "button" — icon only, no visible dd/mm/yyyy field */
   .add-task-row input[type="date"] {
-    flex: none; width: 8.6rem;
+    flex: none;
+    width: 2.3rem;
     border: 1px solid var(--paper-line-strong); background: var(--white); border-radius: 3px;
-    padding: 0.35rem 0.35rem; font-family: var(--font-mono); font-size: 0.76rem; color: var(--ink-soft);
+    padding: 0.45rem 0; color: transparent; cursor: pointer;
+  }
+  .add-task-row input[type="date"]:hover { border-color: var(--green); }
+  .add-task-row input[type="date"]::-webkit-datetime-edit,
+  .add-task-row input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+  .add-task-row input[type="date"]::-webkit-inner-spin-button,
+  .add-task-row input[type="date"]::-webkit-clear-button {
+    display: none;
+  }
+  .add-task-row input[type="date"]::-webkit-calendar-picker-indicator {
+    opacity: 1; cursor: pointer; padding: 0; margin: 0 auto; display: block;
   }
 
   .add-task-row input:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
