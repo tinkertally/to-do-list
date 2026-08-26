@@ -204,7 +204,8 @@
 
   li.task-row { display: flex; align-items: flex-start; gap: 0.55rem; padding: 0.55rem 0; border-bottom: 1px solid var(--paper-line); }
   li.task-row:last-child { border-bottom: none; }
-  li.task-row.editing { align-items: center; }
+  li.task-row.editing { align-items: center; flex-wrap: wrap; row-gap: 0.4rem; }
+  li.task-row.editing .delete-task { order: 3; opacity: 1; }
 
   .check {
     flex: none;
@@ -240,16 +241,26 @@
   li.task-row.overdue .due { color: var(--red-ink); font-weight: 500; }
 
   .edit-task-text {
-    flex: 1 1 auto; min-width: 0;
+    flex: 1 1 100%; min-width: 0; order: 2;
     border: none; border-bottom: 2px solid var(--green); background: transparent;
-    font-family: var(--font-body); font-size: 0.94rem; color: var(--ink); padding: 0 0 0.15rem;
+    font-family: var(--font-body); font-size: 0.94rem; color: var(--ink); padding: 0.15rem 0;
   }
   .edit-task-text:focus-visible { outline: none; }
 
   .edit-task-date {
-    flex: none; width: 8rem;
+    flex: none; order: 3; width: 2.3rem;
     border: 1px solid var(--paper-line-strong); border-radius: 3px; background: var(--white);
-    font-family: var(--font-mono); font-size: 0.74rem; color: var(--ink-soft); padding: 0.2rem 0.35rem;
+    padding: 0.4rem 0; color: transparent; cursor: pointer;
+  }
+  .edit-task-date:hover { border-color: var(--green); }
+  .edit-task-date::-webkit-datetime-edit,
+  .edit-task-date::-webkit-datetime-edit-fields-wrapper,
+  .edit-task-date::-webkit-inner-spin-button,
+  .edit-task-date::-webkit-clear-button {
+    display: none;
+  }
+  .edit-task-date::-webkit-calendar-picker-indicator {
+    opacity: 1; cursor: pointer; padding: 0; margin: 0 auto; display: block;
   }
 
   .delete-task {
