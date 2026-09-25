@@ -365,8 +365,8 @@
   const LOCAL_CACHE_KEY = 'ledger:data';
   const SYNC_ID_KEY = 'ledger:syncId:v2';
   const CARD_SIZES_KEY = 'ledger:cardSizes'; // local to this device/browser only — never synced
-  const SUPABASE_URL = 'https://lagstmracpzmghcnxhuk.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_kix0WCfC9vIq3wyx2CAuPg_IQ-MPKxv';
+  const SUPABASE_URL = 'https://nisnwsncizddsstrjttd.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_tbFyzvYrxOh9PlNBxofGzw_PwTSNrlS';
 
   const app = document.getElementById('app');
   const todayLine = document.getElementById('today-line');
@@ -442,7 +442,7 @@
   }
 
   async function createRemoteBlob(initialState) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/create_ledger`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/task_ledger_create`, {
       method: 'POST',
       headers: supabaseHeaders(),
       body: JSON.stringify({ initial_data: initialState })
@@ -454,7 +454,7 @@
   }
 
   async function fetchRemoteBlob(id) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_ledger`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/task_ledger_get`, {
       method: 'POST',
       headers: supabaseHeaders(),
       body: JSON.stringify({ target_id: id })
@@ -474,7 +474,7 @@
   }
 
   async function putRemoteBlob(id, newState) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/update_ledger`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/task_ledger_update`, {
       method: 'POST',
       headers: supabaseHeaders(),
       body: JSON.stringify({ target_id: id, new_data: newState })
