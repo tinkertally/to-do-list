@@ -516,6 +516,15 @@
     storageNote.textContent = '';
     syncId = window.localStorage.getItem(SYNC_ID_KEY);
 
+    if (syncId && hasPending() && readLocalCache()) {
+      // This browser has edits the server never received, so push them first
+      // instead of loading the older server copy over the top of them.
+      state = readLocalCache();
+      render();
+      pushRemote(0);
+      return;
+    }
+
     if (syncId) {
       syncStatus = 'connecting';
       try {
@@ -554,14 +563,44 @@
       return "sync server is rate-limiting this browser — your changes are saved locally and will retry automatically";
     }
     const msg = (err && err.message) ? err.message : String(err);
-    // A plain "Failed to fetch" with no HTTP status almost always means the request
-    // never left the browser — blocked by the page's origin/context, not a real
-    // connectivity problem. Surface that distinction rather than just "offline".
     if (/Failed to fetch|NetworkError|Load failed/i.test(msg)) {
-      return 'request blocked before it left the browser (often caused by opening this file via a content:// link instead of file://)';
+      if (/^(content|file):/i.test(window.location.protocol)) {
+        return 'request blocked before it left the browser (often caused by opening this file via a content:// link instead of file://)';
+      }
+      return "couldn't reach the sync server. Your changes are saved in this browser. Check your connection or any ad blocker, then click Retry sync.";
     }
     return msg;
   }
+
+  // Remembers whether this browser has edits the sync server hasn't received yet,
+  // so a reload while offline never overwrites them with the older server copy.
+  const PENDING_KEY = 'ledger:pendingPush';
+  function setPending(v) {
+    try { v ? window.localStorage.setItem(PENDING_KEY, '1') : window.localStorage.removeItem(PENDING_KEY); } catch (e) {}
+  }
+  function hasPending() {
+    try { return window.localStorage.getItem(PENDING_KEY) === '1'; } catch (e) { return false; }
+  }
+
+  async function retrySync() {
+    if (!syncId) return;
+    syncStatus = 'connecting';
+    renderSyncPanel();
+    if (hasPending()) { pushRemote(0); return; }
+    try {
+      state = await fetchRemoteBlob(syncId);
+      writeLocalCache();
+      syncStatus = 'synced';
+      syncErrorDetail = null;
+      render();
+    } catch (err) {
+      syncStatus = 'offline';
+      syncErrorDetail = describeSyncError(err);
+      renderSyncPanel();
+    }
+  }
+
+  window.addEventListener('online', () => { if (syncStatus === 'offline') retrySync(); });
 
   let persistDebounceTimer = null;
 
@@ -579,6 +618,7 @@
     // data even if the remote sync push below is delayed or rate-limited.
     if (hasLocalStorage) writeLocalCache();
     if (!syncId) return;
+    setPending(true);
 
     // Debounce the remote push: several quick edits in a row (e.g. adding
     // a handful of tasks back to back) collapse into a single sync request
@@ -593,11 +633,13 @@
     if (!syncId) return;
     try {
       await putRemoteBlob(syncId, state);
+      setPending(false);
       syncErrorDetail = null;
       syncStatus = 'synced';
       renderSyncPanel();
     } catch (err) {
-      if (err && err.status === 429 && retryCount < 4) {
+      const isNetwork = !err.status;
+      if (((err && err.status === 429) || isNetwork) && retryCount < 4) {
         const wait = err.retryAfterMs || (1500 * Math.pow(2, retryCount));
         syncErrorDetail = describeSyncError(err);
         renderSyncPanel();
@@ -805,6 +847,7 @@
       <div class="sync-panel">
         <span class="sync-status">${escapeHtml(labels[syncStatus] || '')}${syncId ? ` · <code>${escapeHtml(syncId)}</code>` : ''}</span>
         ${syncId ? `<button type="button" id="copy-sync-id">Copy ID</button>` : ''}
+        ${syncId && (syncStatus === 'offline' || syncStatus === 'error') ? `<button type="button" id="retry-sync">Retry sync</button>` : ''}
         <button type="button" id="show-connect-sync">Connect a different list</button>
         <button type="button" id="backup-data">Download backup</button>
         <button type="button" id="restore-data">Restore backup</button>
@@ -1021,6 +1064,9 @@
   function attachSyncHandlers() {
     const copyBtn = document.getElementById('copy-sync-id');
     if (copyBtn) copyBtn.addEventListener('click', () => copySyncId(copyBtn));
+
+    const retryBtn = document.getElementById('retry-sync');
+    if (retryBtn) retryBtn.addEventListener('click', retrySync);
 
     const showConnectBtn = document.getElementById('show-connect-sync');
     if (showConnectBtn) showConnectBtn.addEventListener('click', () => {
