@@ -37,14 +37,14 @@
     color: var(--ink);
     font-family: var(--font-body);
     min-height: 100vh;
-    padding: 2.5rem 1.5rem 4rem;
+    padding: 2rem 2rem 4rem;
   }
 
   @media (prefers-reduced-motion: reduce) {
     * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
   }
 
-  .wrap { max-width: 980px; margin: 0 auto; }
+  .wrap { max-width: none; margin: 0 auto; }
 
   header.masthead {
     display: flex;
@@ -365,8 +365,8 @@
   const LOCAL_CACHE_KEY = 'ledger:data';
   const SYNC_ID_KEY = 'ledger:syncId:v2';
   const CARD_SIZES_KEY = 'ledger:cardSizes'; // local to this device/browser only — never synced
-  const SUPABASE_URL = 'https://nisnwsncizddsstrjttd.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_tbFyzvYrxOh9PlNBxofGzw_PwTSNrlS';
+  const SUPABASE_URL = 'https://lagstmracpzmghcnxhuk.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_kix0WCfC9vIq3wyx2CAuPg_IQ-MPKxv';
 
   const app = document.getElementById('app');
   const todayLine = document.getElementById('today-line');
@@ -442,7 +442,7 @@
   }
 
   async function createRemoteBlob(initialState) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/task_ledger_create`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/create_ledger`, {
       method: 'POST',
       headers: supabaseHeaders(),
       body: JSON.stringify({ initial_data: initialState })
@@ -454,7 +454,7 @@
   }
 
   async function fetchRemoteBlob(id) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/task_ledger_get`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_ledger`, {
       method: 'POST',
       headers: supabaseHeaders(),
       body: JSON.stringify({ target_id: id })
@@ -474,7 +474,7 @@
   }
 
   async function putRemoteBlob(id, newState) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/task_ledger_update`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/update_ledger`, {
       method: 'POST',
       headers: supabaseHeaders(),
       body: JSON.stringify({ target_id: id, new_data: newState })
