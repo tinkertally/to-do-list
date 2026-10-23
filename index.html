@@ -19,6 +19,7 @@
     --green: #2f6b48;
     --green-dark: #1f4a32;
     --red-ink: #a8402f;
+    --red-wash: #f7e3de;
     --gold: #b3903f;
     --white: #ffffff;
     --font-display: 'Source Serif 4', Georgia, serif;
@@ -172,6 +173,7 @@
   body.dragging-active { user-select: none; }
   li.task-row.dragging { opacity: 0.4; }
   .ledger-page.dragging { opacity: 0.5; }
+  .ledger-page.drop-target { outline: 2px dashed var(--green); outline-offset: 3px; }
 
   .delete-project {
     position: absolute;
@@ -206,6 +208,34 @@
   li.task-row:last-child { border-bottom: none; }
   li.task-row.editing { align-items: center; flex-wrap: wrap; row-gap: 0.4rem; }
   li.task-row.editing .delete-task { order: 3; opacity: 1; }
+  li.task-row.editing .priority-task { order: 3; }
+
+  /* High priority: red wash and a red rule down the left edge, with the
+     negative margin keeping the row's contents aligned with its neighbours. */
+  li.task-row.priority:not(.done) {
+    background: var(--red-wash);
+    box-shadow: inset 3px 0 0 var(--red-ink);
+    margin: 0 -0.45rem;
+    padding-left: 0.45rem;
+    padding-right: 0.45rem;
+  }
+  li.task-row.priority:not(.done) .task-text { color: var(--red-ink); font-weight: 600; }
+
+  .priority-task {
+    flex: none; width: 1.3rem; height: 1.3rem; padding: 0; margin-top: 0.05rem;
+    background: none; border: 1px solid transparent; border-radius: 3px;
+    color: var(--ink-faint); font: 700 0.8rem/1 var(--font-mono);
+    cursor: pointer; opacity: 0.35; transition: opacity 0.15s, color 0.15s, border-color 0.15s;
+  }
+  li.task-row:hover .priority-task, .priority-task:focus-visible { opacity: 1; }
+  .priority-task:hover { color: var(--red-ink); border-color: var(--red-ink); }
+  li.task-row.priority .priority-task { opacity: 1; background: var(--red-ink); border-color: var(--red-ink); color: var(--white); }
+
+  .move-task-select {
+    flex: 1 1 auto; order: 3; min-width: 0;
+    border: 1px solid var(--paper-line-strong); border-radius: 3px; background: var(--white);
+    font-family: var(--font-body); font-size: 0.8rem; color: var(--ink-soft); padding: 0.3rem 0.35rem;
+  }
 
   .check {
     flex: none;
@@ -754,18 +784,30 @@
     const key = taskKey(project.id, task.id);
     const isEditing = editingTaskKey === key;
 
+    const otherProjects = state.projects.filter(p => p.id !== project.id);
+    const moveHtml = isEditing && otherProjects.length
+      ? `<select class="move-task-select" aria-label="Move task to another project">
+           <option value="">Move to…</option>
+           ${otherProjects.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('')}
+         </select>`
+      : '';
+
     const bodyHtml = isEditing
       ? `<input type="text" class="edit-task-text" value="${escapeAttr(task.text)}" maxlength="200" />
-         <input type="date" class="edit-task-date" value="${task.due || ''}" />`
+         <input type="date" class="edit-task-date" value="${task.due || ''}" />
+         ${moveHtml}`
       : `<span class="task-text" title="Click to edit">${escapeHtml(task.text)}</span>
          <span class="due">${fmtDate(task.due)}</span>`;
 
+    const priorityLabel = task.priority ? 'Remove high priority' : 'Mark as high priority';
+
     return `
-      <li class="task-row ${task.done ? 'done' : ''} ${overdue ? 'overdue' : ''} ${isEditing ? 'editing' : ''}" data-project="${project.id}" data-task="${task.id}">
+      <li class="task-row ${task.done ? 'done' : ''} ${overdue ? 'overdue' : ''} ${isEditing ? 'editing' : ''} ${task.priority ? 'priority' : ''}" data-project="${project.id}" data-task="${task.id}">
         <span class="drag-handle" draggable="true" aria-hidden="true">⋮⋮</span>
         ${reorderBtnsHtml('task-reorder', isFirst, isLast)}
         <button type="button" class="check" aria-label="Toggle done">${checkSvg()}</button>
         ${bodyHtml}
+        <button type="button" class="priority-task" aria-label="${priorityLabel}" aria-pressed="${task.priority ? 'true' : 'false'}" title="${priorityLabel}">!</button>
         <button type="button" class="delete-task" aria-label="Delete task">×</button>
       </li>`;
   }
@@ -989,37 +1031,106 @@
     project.tasks = firstIsDone ? [...untouched, ...reordered] : [...reordered, ...untouched];
   }
 
+  // The task currently being dragged, if any: { row, fromProject, taskId, done, toProject }
+  let taskDrag = null;
+
   function taskDragStart(e, handle) {
     const row = handle.closest('.task-row');
+    const fromProject = row.dataset.project;
+    const project = state.projects.find(p => p.id === fromProject);
+    const task = project && project.tasks.find(t => t.id === row.dataset.task);
+    if (!task) return;
     e.dataTransfer.effectAllowed = 'move';
-    try { e.dataTransfer.setData('text/plain', row.dataset.task); } catch (err) {}
+    try { e.dataTransfer.setData('text/plain', task.id); } catch (err) {}
     try { e.dataTransfer.setDragImage(row, 16, 16); } catch (err) {}
+    taskDrag = { row, fromProject, taskId: task.id, done: task.done, toProject: fromProject };
     row.classList.add('dragging');
     document.body.classList.add('dragging-active');
   }
 
-  function taskDragEnd(e, handle) {
-    const row = handle.closest('.task-row');
-    const list = row.closest('ul.tasks');
-    const projectId = row.dataset.project;
-    row.classList.remove('dragging');
-    document.body.classList.remove('dragging-active');
-    reorderTasksFromDom(list, projectId);
-    persist();
-    render();
+  // The list a dragged task belongs in on a given card: open tasks go to the
+  // card's main list, completed tasks to its Completed list (if it has one).
+  function targetListFor(section) {
+    if (!taskDrag) return null;
+    return taskDrag.done
+      ? section.querySelector('details.completed ul.tasks')
+      : section.querySelector(':scope > ul.tasks');
   }
 
-  function taskListDragOver(e, list) {
-    const dragging = list.querySelector('.task-row.dragging');
-    if (!dragging) return;
+  function cardTaskDragOver(e, section) {
+    if (!taskDrag) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
+
+    const toProject = section.dataset.project;
+    if (taskDrag.toProject !== toProject) {
+      document.querySelectorAll('.ledger-page.drop-target').forEach(s => s.classList.remove('drop-target'));
+      taskDrag.toProject = toProject;
+    }
+    if (toProject !== taskDrag.fromProject) section.classList.add('drop-target');
+
+    const list = targetListFor(section);
+    if (!list) return; // e.g. a completed task over a card with no Completed list yet — appended on drop
+    const row = taskDrag.row;
     const targetRow = e.target.closest('li.task-row');
-    if (targetRow && targetRow !== dragging && targetRow.closest('ul.tasks') === list) {
+    if (targetRow && targetRow !== row && targetRow.parentElement === list) {
       const rect = targetRow.getBoundingClientRect();
       const before = e.clientY < rect.top + rect.height / 2;
-      list.insertBefore(dragging, before ? targetRow : targetRow.nextSibling);
+      list.insertBefore(row, before ? targetRow : targetRow.nextSibling);
+    } else if (row.parentElement !== list) {
+      list.appendChild(row);
     }
+    const emptyMsg = list.querySelector('.empty-tasks');
+    if (emptyMsg) emptyMsg.remove();
+  }
+
+  function taskDragEnd(e) {
+    const drag = taskDrag;
+    taskDrag = null;
+    document.body.classList.remove('dragging-active');
+    document.querySelectorAll('.ledger-page.drop-target').forEach(s => s.classList.remove('drop-target'));
+    if (!drag) return;
+
+    // Dropped outside any card, or cancelled with Escape: put everything back.
+    if (e.dataTransfer && e.dataTransfer.dropEffect === 'none') { render(); return; }
+
+    const from = state.projects.find(p => p.id === drag.fromProject);
+    const to = state.projects.find(p => p.id === drag.toProject) || from;
+    const task = from && from.tasks.find(t => t.id === drag.taskId);
+    if (!task) { render(); return; }
+
+    if (to !== from) {
+      from.tasks = from.tasks.filter(t => t.id !== task.id);
+      to.tasks.push(task);
+    }
+    const list = drag.row.closest('ul.tasks');
+    const landedOnTarget = list && list.closest('.ledger-page') && list.closest('.ledger-page').dataset.project === to.id;
+    if (landedOnTarget) reorderTasksFromDom(list, to.id);
+
+    render();
+    persist();
+  }
+
+  function moveTaskToProject(fromId, taskId, toId) {
+    const from = state.projects.find(p => p.id === fromId);
+    const to = state.projects.find(p => p.id === toId);
+    const task = from && from.tasks.find(t => t.id === taskId);
+    if (!task || !to || from === to) return;
+    from.tasks = from.tasks.filter(t => t.id !== taskId);
+    to.tasks.push(task);
+    render();
+    persist();
+  }
+
+  function togglePriority(projectId, taskId) {
+    // If this task is open for editing, save the typed changes before re-rendering.
+    if (editingTaskKey === taskKey(projectId, taskId)) commitTaskEdit(projectId, taskId, false);
+    const project = state.projects.find(p => p.id === projectId);
+    const task = project && project.tasks.find(t => t.id === taskId);
+    if (!task) return;
+    task.priority = !task.priority;
+    render();
+    persist();
   }
 
   function reorderProjectsFromDom(board) {
@@ -1217,15 +1328,30 @@
 
     document.querySelectorAll('.drag-handle').forEach(handle => {
       handle.addEventListener('dragstart', (e) => taskDragStart(e, handle));
-      handle.addEventListener('dragend', (e) => taskDragEnd(e, handle));
-    });
-    document.querySelectorAll('ul.tasks').forEach(list => {
-      list.addEventListener('dragover', (e) => taskListDragOver(e, list));
-      list.addEventListener('drop', (e) => e.preventDefault());
+      handle.addEventListener('dragend', (e) => taskDragEnd(e));
     });
 
     document.querySelectorAll('.ledger-page').forEach(section => {
       trackCardResize(section, section.dataset.project);
+      section.addEventListener('dragover', (e) => cardTaskDragOver(e, section));
+      section.addEventListener('drop', (e) => { if (taskDrag) e.preventDefault(); });
+    });
+
+    document.querySelectorAll('.priority-task').forEach(btn => {
+      const row = btn.closest('.task-row');
+      btn.addEventListener('click', () => togglePriority(row.dataset.project, row.dataset.task));
+    });
+
+    document.querySelectorAll('.move-task-select').forEach(sel => {
+      const row = sel.closest('.task-row');
+      const projectId = row.dataset.project;
+      const taskId = row.dataset.task;
+      sel.addEventListener('change', () => {
+        const toId = sel.value;
+        if (!toId) return;
+        commitTaskEdit(projectId, taskId, false); // keep any text/date edits first
+        moveTaskToProject(projectId, taskId, toId);
+      });
     });
 
     document.querySelectorAll('.drag-handle-project').forEach(handle => {
